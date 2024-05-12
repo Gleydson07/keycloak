@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  keycloak:
+    container_name: keycloak
+    image: quay.io/keycloak/keycloak:24.0
+    command: start-dev
+    ports:
+      - 8080:8080
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_USER}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_PASS}
+      - KC_DB=${KC_DB_TYPE}
+      - KC_DB_USERNAME=${POSTGRES_USER}
+      - KC_DB_PASSWORD=${POSTGRES_PASS}
+      - KC_DB_URL=jdbc:postgresql://db:5432/${POSTGRES_DB_NAME}
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - nt_kc
+
+  db:
+    container_name: postgres
+    image: postgres:latest
+    volumes:
+      - /data/postgres:/data/postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASS}
+      - POSTGRES_DB=${POSTGRES_DB_NAME}
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "${POSTGRES_DB_NAME}", "-U", "${POSTGRES_USER}" ]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+    env_file:
+      - .env
+    networks:
+      - nt_kc
+
+  pgadmin:
+    links:
+      - db:postgres
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASS}
+    ports:
+      - "8081:80"
+    volumes:
+      - /data/pgadmin:/root/.pgadmin
+    env_file:
+      - .env
+    networks:
+      - nt_kc
+
+networks:
+  nt_kc:
+    driver: bridge
